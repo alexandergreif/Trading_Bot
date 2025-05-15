@@ -1,0 +1,108 @@
+# Bitcoin Futures Trading Bot - Product Requirements Document
+
+## Project Overview
+Entwicklung eines lokal laufenden, vollständig autonomen Trading Bots für Bitcoin Futures, der nach der Liquidity-Sweep-Order-Block-Strategie handelt, die Positionsgröße strikt am Kontorisiko (≤ 1% je Trade) ausrichtet und alle Trades, KPIs & Logs lokal persistiert.
+
+## System Architecture
+```
+┌────────────┐     WebSocket      ┌──────────────┐
+│ Bitunix    │──── Depth Stream ─▶│ LSOB-Detector│
+│ Futures API│                   └──────┬───────┘
+│  (REST/WS) │◀── Orders / Bal ──┐       │Signal
+└────────────┘                  │       ▼
+                                │ ┌──────────────┐  SQLite   ┌────────────┐
+                                └▶│Position-Mgr  ├──────────▶│ trades.db  │
+                                  └──────────────┘           └────────────┘
+                                                 ▲
+                                                 │ (read-only)
+                                   ┌─────────────┴─────────────┐
+                                   │ Streamlit Dashboard (UI)  │
+                                   └───────────────────────────┘
+```
+
+## Technology Stack
+- Core Language: Python 3.12 (asyncio, Pydantic 2)
+- Network/Auth: httpx, websockets, hmac.sha256 (self-made)
+- CLI: typer
+- Persistence: sqlite3 (stdlib)
+- Monitoring: streamlit + plotly
+- Tests/Lint: pytest, ruff, black
+
+## Folder Structure
+```
+trading_bot/
+├── exchange/       # Bitunix API Client
+├── strategy/       # LSOB Strategy
+├── trading/        # Position & Risk Management
+├── data/           # SQLite Interface
+├── ui/             # Streamlit Dashboard
+├── backtest/       # Backtesting Engine
+├── cli/            # Command Line Interface
+└── tests/          # Unit & Integration Tests
+```
+
+## Key Requirements
+
+### Exchange Module
+- Implementierung eines Bitunix REST API Clients
+- WebSocket-Verbindung für Depth Stream
+- Authentifizierung und Signierung
+- Reconnect-Logik und Rate-Limiting
+
+### LSOB Strategy
+- Order Book Imbalance-Erkennung
+- Sweep-Pattern-Detektor
+- Signal-Generierung mit Konfidenz-Score
+- Parameterisierung der Strategie
+
+### Position Management
+- Position-Eröffnung basierend auf Signalen
+- Risikomanagement (1% Kontorisiko pro Trade)
+- OCO-Exit-Strategien (Take Profit/Stop Loss)
+- Position-Tracking und Status-Updates
+
+### Data Persistence
+- SQLite-Datenbankschema für Trades und KPIs
+- CRUD-Operationen für Trading-Daten
+- Performance-Metriken und Statistiken
+
+### KPI Tracking
+- Win-Rate-Berechnung
+- Drawdown-Monitoring
+- Auto-Tune-Mechanismus für Strategie-Parameter
+
+### Command Line Interface
+- Hauptprogramm mit Typer
+- Befehle für Initialisierung, Live-Trading, Backtest
+- Konfigurationsmanagement
+
+### Dashboard
+- Streamlit-UI für Echtzeit-Monitoring
+- Equity-Kurve und Performance-Metriken
+- Trade-Historie und aktuelle Positionen
+
+### Backtesting
+- Historische Daten-Verarbeitung
+- Strategie-Simulation
+- Parameter-Optimierung
+- Performance-Vergleich
+
+## Milestones
+1. Exchange-Modul funktionsfähig, erste Order im Mainnet
+2. LSOB-Strategie erkennt Muster, generiert Signale
+3. End-to-End Trade-Ausführung, Daten in DB
+4. Dashboard zeigt Live-Daten und Performance
+5. Bot handelt autonom im Mainnet mit minimaler Position
+
+## Definition of Done
+- Live-Bot läuft ≥ 72h ohne Absturz
+- Win-Rate-Tracker aktualisiert sich, DB enthält Trades
+- Dashboard zeigt Echt-Zeit, keine Null-/NaN-Werte
+- README: Install → Config → Start in < 5 Minuten
+- pytest > 90% Line-Coverage Kernmodule
+
+## Constraints & Risks
+- API-Rate-Limits: Implementierung von WS-Reconnect-Backoff, REST-Throttle
+- Bitunix-Doku ändert Sign-Version: Unit-Test, CI-Nightly-Call; Wrap Sign-Logic in Version-Switch
+- 24/7-Betrieb: Empfehlung für Mini-PC / Cloud-VPS + systemd-Service
+- LSOB-Params overfit Backtest: Rolling 90-d KPIs + Auto-Tune, Sandbox-First
